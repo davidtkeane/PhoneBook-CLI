@@ -1,10 +1,18 @@
 # PhoneBook CLI Application
 
-![PhoneBook CLI](https://img.shields.io/badge/PhoneBook-CLI-blue)
+## Github
+[![PhoneBook CLI](https://img.shields.io/badge/PhoneBook-CLI-blue)](https://github.com/davidtkeane/PhoneBook-CLI)
+[![Sleep CLI](https://img.shields.io/badge/Sleep-CLI-blue)](https://github.com/davidtkeane/Sleep-CLI)
+[![Gmail CLI](https://img.shields.io/badge/Gmail-CLI-red?style=flat&logo=gmail&logoColor=white&labelColor=gray)](https://github.com/davidtkeane/gmail-multi-cli)
+[![Gmail Python CLI](https://img.shields.io/badge/Gmail-Python%20CLI-blue?style=flat&logo=gmail&logoColor=white&labelColor=red)](https://github.com/davidtkeane/gmail-multi-cli)
+
 ![GitHub last commit](https://img.shields.io/github/last-commit/davidtkeane/PhoneBook-CLI?style=flat-square)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/w/davidtkeane/PhoneBook-CLI?authorFilter=davidtkeane)
 ![GitHub issues](https://img.shields.io/github/issues-raw/davidtkeane/PhoneBook-CLI?style=flat-square)
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/davidtkeane)
+
+![Discord](https://img.shields.io/discord/815701213827301396)
+
 ![Python](https://img.shields.io/badge/Python-3.7%2B-blue)  
 ![License](https://img.shields.io/badge/License-MIT-green) 
 
@@ -47,6 +55,7 @@ python phone.py
 ## Installation to be able to run in the terminal.
 
 1. **Download the file:**
+
 A:
 ```
 git clone https://github.com/yourusername/phonebook-cli/phone
