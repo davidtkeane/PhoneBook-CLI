@@ -9,6 +9,7 @@
 # Instructions for running the application:
 # 1. After downloading the file, run the following command to make it executable:
 #    chmod +x phone
+#
 # 2. Copy or move the file to a directory in your PATH to run it from anywhere.
 #    For example, Copy the phone file to /usr/local/bin/phone to run from the terminal.
 #    sudo cp phone /usr/local/bin/phone
