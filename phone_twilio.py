@@ -5,7 +5,7 @@
 #
 # Created by Ranger (Dec 2024) Version 1.0.0
 # Modified by David Keane (Dec 31st 2024) Version 3.0.1
-#
+# Twillo Integration by David Keane (Jan 9th 2025) Version 3.0.3
 # Instructions for running the application:
 # 1. After downloading the file, run the following command to make it executable:
 #    chmod +x phone
@@ -74,7 +74,7 @@
 # - The application hashes the password using SHA-256 before storing it in the file.
 #
 #
-# PhoneBook App for Python and CLI
+# PhoneBook & Twilio App for Python and CLI
 
 # Import the necessary modules
 import sqlite3
@@ -89,9 +89,14 @@ import vobject
 import csv
 import tkinter as tk
 from tkinter import filedialog
+from twilio.rest import Client
+import base64
+import datetime
 
 # Password file path
 PASSWORD_FILE = "/Users/Ranger/.db/password.txt"
+LOG_FILE = "/Users/Ranger/.db/phonebook.log"
+
 
 # This is the banner for the bot
 def banner():
@@ -220,12 +225,36 @@ def create_table(conn):
             birthday TEXT
         )
     ''')
+def log_activity(action, details):
+    """Logs an activity to the log file."""
+    timestamp = datetime.datetime.now().isoformat()
+    log_entry = f"{timestamp} - User: {get_username()} - Action: {action} - Details: {details}\n"
+    hashed_log_entry = hashlib.sha256(log_entry.encode()).hexdigest() + "\n"
+    try:
+        with open(LOG_FILE, 'a') as log_file:
+            log_file.write(hashed_log_entry)
+    except Exception as e:
+        print(f"{Fore.RED}Error writing to log file: {e}{Style.RESET_ALL}")
+
+def display_log():
+    """Displays the log file content."""
+    try:
+        if not os.path.exists(LOG_FILE):
+            print(f"{Fore.YELLOW}No log file found.{Style.RESET_ALL}")
+            return
+        with open(LOG_FILE, 'r') as log_file:
+            for line in log_file:
+                print(f"{Fore.CYAN}{line.strip()}{Style.RESET_ALL}")
+    except Exception as e:
+        print(f"{Fore.RED}Error reading log file: {e}{Style.RESET_ALL}")
+
 
 def add_contact(conn, name, phone, email, address, email2=None, company=None, job_title=None, website=None, notes=None, birthday=None):
     try:
         conn.execute("INSERT INTO contacts (name, phone, email, address, email2, company, job_title, website, notes, birthday) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (name, phone, email, address, email2, company, job_title, website, notes, birthday))
         conn.commit()
         print("Contact added successfully!")
+        log_activity("Add Contact", f"Added contact: {name}")
     except sqlite3.Error as e:
         print(f"Error adding contact: {e}")
 
@@ -313,6 +342,7 @@ def edit_contact(conn, contact_id=None):
         conn.execute("UPDATE contacts SET name = ?, phone = ?, email = ?, address = ?, email2=?, company=?, job_title=?, website=?, notes=?, birthday=? WHERE id = ?", (name, phone, email, address, email2, company, job_title, website, notes, birthday, contact_id))
         conn.commit()
         print("Contact updated successfully!")
+        log_activity("Edit Contact", f"Edited contact ID: {contact_id}")
     except sqlite3.Error as e:
         print(f"Error updating contact: {e}")
 
@@ -350,8 +380,19 @@ def delete_contact(conn, contact_id=None):
         conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
         conn.commit()
         print("Contact deleted successfully.")
+        log_activity("Delete Contact", f"Deleted contact ID: {contact_id}")
     except sqlite3.Error as e:
         print(f"Error deleting contact: {e}")
+def ensure_log_dir_exists():
+    log_dir = os.path.dirname(LOG_FILE)
+    if not os.path.exists(log_dir):
+        if not run_sudo_command(['mkdir', '-p', log_dir]):
+            print(f"Failed to create the log file directory: {log_dir}")
+            sys.exit(1)
+        if not run_sudo_command(['chown', f"{os.getlogin()}:{os.getlogin()}", log_dir]):
+            print("Failed to set permissions on log file directory.")
+            sys.exit(1)
+
 
 def ensure_db_exists(db_path):
     """Ensures that the database file and its directory exist."""
@@ -369,6 +410,13 @@ def ensure_db_exists(db_path):
                    exit(1)
             if not run_sudo_command(['chown', f"{os.getlogin()}:{os.getlogin()}", db_path]):
                 print("Failed to set permissions on database file.")
+                exit(1)
+    if not os.path.exists(LOG_FILE):
+           if not run_sudo_command(['touch', LOG_FILE]):
+                   print("Failed to create the database file.")
+                   exit(1)
+           if not run_sudo_command(['chown', f"{os.getlogin()}:{os.getlogin()}", LOG_FILE]):
+                print("Failed to set permissions on the log file.")
                 exit(1)
 
 
@@ -511,6 +559,116 @@ def open_file_dialog():
     )
     return file_path
 
+# Twilio Credentials
+ACCOUNT_SID = 'AC-TOKEN-HERE'
+AUTH_TOKEN = '443a-AUTH-TOKEN-HERE'
+PHONE_NUMBER = '+121345345(Add in + and the country code 1 is for USA)'
+
+def get_twilio_credentials():
+        return ACCOUNT_SID, AUTH_TOKEN, PHONE_NUMBER
+
+def send_test_message(conn):
+    to_number = "+353873151465"
+    message_text = "This is a test from Twilio!"
+    account_sid, auth_token, from_number = get_twilio_credentials()
+    try:
+        client = Client(account_sid, auth_token)
+        message = client.messages.create(
+            body=message_text,
+            from_=from_number,
+            to=to_number
+        )
+        print(f"Message sent successfully to Dave.")
+        print(f"Message sent with SID: {message.sid}")
+        log_activity("Send Test Message", f"Sent a test message to {to_number}")
+    except Exception as e:
+          print(f"{Fore.RED}Error sending message: {e}{Style.RESET_ALL}")
+
+def send_message(conn):
+    while True:
+        print("\nSend Message Menu:")
+        print("1. Select a contact to message")
+        print("2. Enter a number to send a message")
+        print("3. Send Test Message")
+        print("0. Back")
+
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+           contacts = conn.execute("SELECT * FROM contacts").fetchall()
+           if not contacts:
+              print("No contacts found. Cannot send message.")
+              return
+
+           print("\nAvailable contacts:")
+           display_contacts(contacts)
+           print("")
+
+           try:
+              contact_id = input("Enter the ID of the contact to message, or Enter to go back: ")
+              if not contact_id:
+                  return
+              contact_id = int(contact_id)
+           except ValueError:
+              print("Invalid contact ID. Please enter a number.")
+              return
+
+           contact = conn.execute("SELECT * FROM contacts WHERE id = ?", (contact_id,)).fetchone()
+           if not contact:
+              print("Contact not found.")
+              return
+           
+           to_number = contact[2]  # Use the contact's phone number
+           if not to_number:
+              print("This contact does not have a phone number. Please add a number before sending a text.")
+              return
+           message_text = input("Enter your message: ")
+           if not message_text:
+             print("Message cannot be empty. ")
+             return
+           account_sid, auth_token, from_number = get_twilio_credentials()
+           try:
+              client = Client(account_sid, auth_token)
+              message = client.messages.create(
+                  body=message_text,
+                  from_=from_number,
+                  to=to_number
+              )
+              print(f"Message sent successfully to {contact[1]}.")
+              print(f"Message sent with SID: {message.sid}")
+              log_activity("Send Message", f"Sent a message to {contact[1]}, Number: {to_number}")
+              return
+           except Exception as e:
+                print(f"{Fore.RED}Error sending message: {e}{Style.RESET_ALL}")
+
+        elif choice == '2':
+           to_number = input("Enter the phone number to message (or 'back' to return to menu): ")
+           if to_number.lower() == 'back':
+                continue
+           message_text = input("Enter your message (or 'back' to return to menu): ")
+           if message_text.lower() == 'back':
+                continue
+           account_sid, auth_token, from_number = get_twilio_credentials()
+           try:
+                client = Client(account_sid, auth_token)
+                message = client.messages.create(
+                    body=message_text,
+                    from_=from_number,
+                    to=to_number
+                )
+                print(f"Message sent successfully to {to_number}.")
+                print(f"Message sent with SID: {message.sid}")
+                log_activity("Send Message", f"Sent a message to {to_number}")
+                return
+           except Exception as e:
+                print(f"{Fore.RED}Error sending message: {e}{Style.RESET_ALL}")
+        elif choice == '3':
+           send_test_message(conn)
+        elif choice == '0':
+            return
+        else:
+           print("Invalid choice, please try again!")
+
 
 # Display the user information
 def main():
@@ -526,7 +684,7 @@ def main():
         print("")
         print(f"{GREEN}If you are a new user, please set a new PhoneBook password.{NC}")
         print("")
-
+        ensure_log_dir_exists()
         ensure_password_dir_exists()
         db_path = "/Users/Ranger/.db/phonebook.db"  # Default database path
 
@@ -537,7 +695,7 @@ def main():
             ask_sudo_password()
         ensure_db_exists(db_path)
         check_password()
-
+        
         conn = sqlite3.connect(db_path)
         create_table(conn)
 
@@ -550,6 +708,8 @@ def main():
             print("5. Delete Contact")
             print("6. Set Password")
             print("7. Import Contacts")
+            print("8. Send Message")
+            print("9. View Log")
             print("0. Exit")
 
             choice = input("Enter your choice: ")
@@ -588,7 +748,10 @@ def main():
                      import_csv(file_path,conn)
                   else:
                     print(f"{Fore.RED}Unsupported file format. Please select a .vcf or .csv file.{Style.RESET_ALL}")
-
+            elif choice == '8':
+               send_message(conn)
+            elif choice == '9':
+                display_log()
             elif choice == '0':
                 conn.close()
                 break
